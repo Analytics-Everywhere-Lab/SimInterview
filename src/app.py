@@ -1,6 +1,8 @@
 import gradio as gr
 from utils import handle_upload  # đảm bảo utils.handle_upload có sẵn
 
+
+
 with gr.Blocks(title="Document Upload for RAG") as demo:
     with gr.Row():
         # Cột trái: nội dung chính (hiện tại chỉ để thông báo, bạn có thể bỏ hoặc điền tính năng khác)
@@ -31,28 +33,18 @@ with gr.Blocks(title="Document Upload for RAG") as demo:
                 variant="primary",
                 size="lg",
             )
-
-            # feedback = gr.Textbox(
-            #     label="Feedback and Suggestion",
-            #     placeholder="Your tailored feedback will appear here after analysis…",
-            #     interactive=False,
-            #     lines=6
-            # )
-            # upload_btn.click(
-            #     fn=handle_upload,
-            #     inputs=[cv, jd],
-            #     outputs=[feedback]
-            # )
+            status_md = gr.Markdown("", elem_id="status_panel")
             with gr.Accordion("📝 Feedback & Suggestions", open=False):
                 feedback_md = gr.Markdown(
-                    "Upload CV & JD rồi nhấn **Get Feedback** để xem gợi ý cải thiện.",
+                    "Upload CV & JD and press Feedback Button to get valuable feedback to improve your CV.",
                     elem_id="feedback_panel"
                 )
-
+            cv_store = gr.State()
+            jd_store = gr.State()
             upload_btn.click(
                 fn=handle_upload,
                 inputs=[cv, jd],
-                outputs=[feedback_md]
+                outputs=[status_md, feedback_md, cv_store, jd_store]
             )
 
 demo.launch()

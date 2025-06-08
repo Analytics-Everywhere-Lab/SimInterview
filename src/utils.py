@@ -1,5 +1,6 @@
 from llm import get_llm_output
 import pymupdf
+from rag import save_doc_to_vector_store
 
 def handle_upload(cv_files, jd_files):
     """Main handler: extract, index, and feedback."""
@@ -8,23 +9,21 @@ def handle_upload(cv_files, jd_files):
     # Extract texts
     cv_text = extract_text_from_pdfs(cv_files)
     jd_text = extract_text_from_pdfs(jd_files)
-    # # Index into RAG vector DB
-    # chunk_and_index(cv_text, "cv_collection")
-    # chunk_and_index(jd_text, "jd_collection")
+    # Save to RAG
+    vectordb_cv = save_doc_to_vector_store(cv_text, "cv_collection", "cv.pdf")
+    vectordb_jd = save_doc_to_vector_store(jd_text, "jd_collection", "jd.pdf")
     # Generate feedback
     feedback = generate_feedback(cv_text, jd_text)
-    return feedback
+    status = "✅ Candidate information confirmed and indexed. Starting interview…"
+    return status, feedback, vectordb_cv, vectordb_jd
 
 def extract_text_from_pdfs(files):
     """Extract full text from a list of PDF files."""
     if not files:
         return "No files provided."
-    if not isinstance(files, list):
-        files = [files]
     text = ""
-    for f in files or []:
-        with pymupdf.open(f) as pdf:
-            text += "".join(page.get_text() for page in pdf)
+    with pymupdf.open(files) as pdf:
+        text += "".join(page.get_text() for page in pdf)
     return text
 
 # function to structure CV text into a clean format
@@ -112,7 +111,7 @@ using the following structured framework:
    g. Professional Branding – Strong summary, consistent formatting, contact info.
 
 2. For each criterion:
-   - Provide a **brief review**: highlight strengths and gaps.
+   - Provide a **brief review**: highlight strengths and gaps (write in short sentences and focus on main points).
    - Offer **2–3 short actionable suggestions** to improve that aspect of the resume.
 
 3. Finally, summarize **top 3 priority actions** the candidate should take 
@@ -128,7 +127,7 @@ Return your output in Markdown, with sections:
 
 (Repeat for each criterion)
 
-## Top 3 Priority Actions
+## Top best Actions to improve the CV:
 1. …
 2. …
 3. …
