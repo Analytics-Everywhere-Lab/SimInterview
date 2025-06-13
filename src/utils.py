@@ -1,8 +1,10 @@
-from llm import get_llm_output
+from llm import get_llm_output, get_llm_output_with_parser
 import pymupdf
 from rag import save_doc_to_vector_store
+from typing import List
 
-def handle_upload(cv_files, jd_files):
+# Function to handle CV and JD uploads, extract text, index into RAG, and generate feedback
+def handle_upload(cv_files, jd_files, question_bank=None):
     """Main handler: extract, index, and feedback."""
     if not cv_files or not jd_files:
         return "❌ Please upload both CV and Job Description PDFs."
@@ -14,8 +16,10 @@ def handle_upload(cv_files, jd_files):
     vectordb_jd = save_doc_to_vector_store(jd_text, "jd_collection", "jd.pdf")
     # Generate feedback
     feedback = generate_feedback(cv_text, jd_text)
+    question_bank = generate_question_bank(cv_text, jd_text)
     status = "✅ Candidate information confirmed and indexed. Starting interview…"
-    return status, feedback, vectordb_cv, vectordb_jd
+    return status, feedback, vectordb_cv, vectordb_jd, question_bank
+
 
 def extract_text_from_pdfs(files):
     """Extract full text from a list of PDF files."""
@@ -151,3 +155,45 @@ Candidate Resume:
         system_role=system_prompt,
         prompt=user_prompt
     )
+
+# Function to generate a question bank based on CV and JD
+def generate_question_bank(cv_text: str, jd_text: str) -> List[str]:
+    
+    system_prompt = """
+    You are a senior HR specialist and career advisor. Your task is to generate an interview question bank for a candidate, based on their resume (CV) and the provided Job Description (JD).
+
+    Instructions:
+    - Produce between 5 and 8 questions.
+    - Order the questions from easiest to most difficult.
+    - Cover the following areas:
+    1. Career goals
+    2. Technical skills
+    3. Soft skills
+    4. Language skills
+    5. Projects
+    6. Work experience (with additional depth and focus)
+    - Questions should be clear, concise, and tailored to evaluate the candidate’s fit for the role described in the JD.
+
+    Only return the output as a JSON object with a single key "questions" mapping to an array of strings, without any additional text.
+    """
+
+    user_prompt = f"""
+    Job Description:
+    '''
+    {jd_text}
+    '''
+
+    Candidate Resume:
+    '''
+    {cv_text}
+    '''
+    """
+
+    # Call the LLM
+    raw_output = get_llm_output_with_parser(
+        max_tokens=500,
+        system_role=system_prompt,
+        prompt=user_prompt
+    )
+
+    return raw_output

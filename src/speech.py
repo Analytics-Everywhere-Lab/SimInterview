@@ -6,13 +6,6 @@ from llm import get_llm_output
 # Initialize OpenAI client for Whisper
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-INITIAL_QUESTIONS = [
-    "1. Tell me about a data analysis project where you used SQL to extract insights. What challenges did you face?",
-    "2. How have you used Python libraries like pandas or NumPy to clean and transform data?",
-    "3. Describe a dashboard you built in Tableau (or another BI tool). What metrics did you highlight?",
-    # … add as many as you like
-]
-
 # Define a fixed system prompt for the interviewer persona
 INTERVIEWER_SYSTEM_PROMPT = """
 You are a professional technical interviewer. 
@@ -36,7 +29,7 @@ def synthesize_speech(text, lang="en"):
     tts.save(out_path)
     return out_path
 
-def voice_interaction(user_audio, history, q_idx):
+def voice_interaction(user_audio, history, q_idx, question_bank):
     # Nếu user chưa nói gì
     if not user_audio:
         return history, None, history, q_idx
@@ -47,8 +40,8 @@ def voice_interaction(user_audio, history, q_idx):
 
     # Next question
     next_idx = q_idx + 1
-    if next_idx < len(INITIAL_QUESTIONS):
-        bot_text = INITIAL_QUESTIONS[next_idx]
+    if next_idx < len(question_bank):
+        bot_text = question_bank[next_idx]
     else:
         bot_text = "🎉 Thank you! This concludes our interview."
 
