@@ -1,14 +1,13 @@
 from langchain_chroma import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_community.embeddings import OpenAIEmbeddings
 from variables import GPT_EMBEDDING_MODEL
 from langchain.schema import Document
-
+from config import OPENAI_API_KEY
 import os
 
 
 # === Configuration ===
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Directory to persist Chroma vector DBs
 PERSIST_DIR = "../chroma_db"
 

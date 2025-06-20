@@ -3,3 +3,5 @@ data/
 model/
 chroma_db/
 ditto-talkinghead/
+src/config.py
+src/__pycache__/

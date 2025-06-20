@@ -2,13 +2,14 @@ import os
 import gradio as gr
 from gtts import gTTS
 from openai import OpenAI
-from llm import get_llm_output
+from llm_parser import get_llm_output
+from config import OPENAI_API_KEY
 # Initialize OpenAI client for Whisper
-openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai = OpenAI(api_key=OPENAI_API_KEY)
 
 # Define a fixed system prompt for the interviewer persona
 INTERVIEWER_SYSTEM_PROMPT = """
-You are a professional technical interviewer. 
+You are a professional technical interviewer in the business domain. 
 Your goal is to ask clear, relevant follow-up questions to evaluate the candidate's skills and experience.
 Be concise, polite, and stay on topic.
 """
@@ -40,10 +41,11 @@ def voice_interaction(user_audio, history, q_idx, question_bank):
 
     # Next question
     next_idx = q_idx + 1
-    if next_idx < len(question_bank):
-        bot_text = question_bank[next_idx]
-    else:
-        bot_text = "🎉 Thank you! This concludes our interview."
+    # if next_idx < len(question_bank):
+    #     bot_text = question_bank[next_idx]
+    # else:
+    #     bot_text = "🎉 Thank you! This concludes our interview."
+    bot_text = interview(user_text, history)[1][-1][1]
 
     # TTS cho câu hỏi kế tiếp
     bot_audio = synthesize_speech(bot_text)
@@ -51,6 +53,14 @@ def voice_interaction(user_audio, history, q_idx, question_bank):
     # Update history: add (user_answer, bot_question)
     new_history = history + [(user_text, bot_text)]
 
+    return new_history, bot_audio, new_history, next_idx
+
+def text_interaction(user_text, history, q_idx):
+    print("DEBUG: user_text =", user_text)
+    next_idx = q_idx + 1
+    bot_text = interview(user_text, history)[1][-1][1]
+    bot_audio = synthesize_speech(bot_text)
+    new_history = history + [(user_text, bot_text)]
     return new_history, bot_audio, new_history, next_idx
 
 
@@ -79,4 +89,4 @@ def interview(user_message, history):
     new_history = history + [(user_message, bot_reply)]
 
     # Gradio Chatbot với Textbox thường dùng (history, history) làm outputs
-    return new_history, new_history
+    return new_history, new_history 

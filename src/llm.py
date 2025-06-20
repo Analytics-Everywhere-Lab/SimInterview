@@ -1,100 +1,95 @@
-from openai import OpenAI
-from dotenv import load_dotenv
-from typing import List
-
-from langchain.output_parsers import PydanticOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field, validator
-from langchain_openai import ChatOpenAI
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
 import os
-import time
+import gradio as gr
+from gtts import gTTS
+from langchain_openai import ChatOpenAI
+from openai import OpenAI
+from llm_parser import get_llm_output
+from config import OPENAI_API_KEY
+from video import generate_interviewer_video
+# Initialize OpenAI client for Whisper
+openai = OpenAI(api_key=OPENAI_API_KEY)
 
-# Load environment variables
-_ = load_dotenv()
-api_key_nvi = os.environ["NVIDIA_API_KEY"]
 
-api_key = os.environ["OPENAI_API_KEY"]
+def transcribe_audio(audio_path):
+    """speech to text."""
+    with open(audio_path, "rb") as f:
+        resp = openai.audio.transcriptions.create(model="whisper-1", file=f)
+    return getattr(resp, "text", "") or getattr(resp, "transcription", "")
 
-# Hàm gọi LLM để lấy nội dung response
-def get_llm_output(temperature, max_tokens, system_role, prompt,
-                   frequency_penalty=0, presence_penalty=0, stop=None, llm_type="nvidia"):
-    """
-    Gọi LLM và trả về nội dung response. Nếu system_role là chuỗi rỗng,
-    ta chỉ đưa message user, không đưa message system.
-    """
-    start_time = time.time()
-    if llm_type == "openai":
-        # Sử dụng OpenAI API
-        client = OpenAI(
-            api_key=api_key,
+
+def synthesize_speech(text, lang="en"):
+    """text to speech."""
+    tts = gTTS(text=text, lang=lang)
+    out_path = "response.mp3"
+    tts.save(out_path)
+    return out_path
+
+
+class InterviewChatbot:
+    def __init__(self):
+        self.PROMPT_TEMPLATE = f"""
+        You are a professional interviewer in the business domain. 
+        Your goal is to ask clear, relevant follow-up questions to evaluate the candidate's skills and experience.
+        Be concise, polite, and stay on topic.
+        When all questions in the question bank are asked, you should end the conversation and thank the candidate for their time. Tell them that you will review their answers and get back to them soon.
+        Here are possible questions based on their resume and the job description:
+        """
+        self.client = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=OPENAI_API_KEY,
+            temperature=0.7,
+            max_tokens=4096,
         )
-        # Chỉ thêm system message khi system_role không rỗng
-        messages = []
-        if system_role and system_role.strip():
-            messages.append({"role": "system", "content": system_role})
-        messages.append({"role": "user", "content": prompt})
 
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            stop=stop,
+    def text_interaction(self, user_text, history, q_bank):
+        self.question_bank = q_bank
+        print("DEBUG: user_text =", user_text)
+        response = self.generate_response(
+            history, {"role": "user", "content": user_text}
         )
-        end_time = time.time()
-        print('Finish generating response in', round((end_time - start_time), 2), 'seconds')
-        return completion.choices[0].message.content
-    else:
-        # Sử dụng NVIDIA API
-        # Chỉ sử dụng NVIDIA API nếu llm_type là "nvidia"
-        client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
-            api_key=api_key_nvi,
+        bot_text = response.strip()
+        print("DEBUG: bot_text =", bot_text)
+        # TTS for the next question
+        bot_audio = synthesize_speech(bot_text)
+        # Update history: add (user_answer, bot_question)
+        new_history = history + [
+            {"role": "user", "content": user_text},
+            {"role": "assistant", "content": bot_text},
+        ]
+            
+        video_path = generate_interviewer_video(bot_audio)
+
+        return "", new_history, video_path
+    
+    def video_interaction(self, user_video, history, q_bank):
+        self.question_bank = q_bank
+        user_text = transcribe_audio(user_video)
+        print("DEBUG: user_text =", user_text)
+        response = self.generate_response(
+            history, {"role": "user", "content": user_text}
         )
-        # Chỉ thêm system message khi system_role không rỗng
-        messages = []
-        if system_role and system_role.strip():
-            messages.append({"role": "system", "content": system_role})
-        messages.append({"role": "user", "content": prompt})
+        bot_text = response.strip()
+        print("DEBUG: bot_text =", bot_text)
+        # TTS for the next question
+        bot_audio = synthesize_speech(bot_text)
+        # Update history: add (user_answer, bot_question)
+        new_history = history + [
+            {"role": "user", "content": user_text},
+            {"role": "assistant", "content": bot_text},
+        ]
+        video_path = generate_interviewer_video(bot_audio)
 
-        completion = client.chat.completions.create(
-            model="meta/llama-3.3-70b-instruct",
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            stop=stop,
+        return "", new_history, video_path
+
+
+    def generate_response(self, history, new_message):
+        """
+        Generate a response from the LLM based on the chat history and new message.
+        """
+        messages = (
+            [{"role": "system", "content": self.PROMPT_TEMPLATE + "\n".join(self.question_bank)}]
+            + history
+            + [new_message]
         )
-        end_time = time.time()
-        print('Finish generating response in', round((end_time - start_time), 2), 'seconds')
-        return completion.choices[0].message.content
-
-# Model để phân tích cú pháp câu hỏi phỏng vấn
-class QuestionBank(BaseModel):
-    questions: List[str] = Field(descriptions="List of interview questions")
-
-def get_llm_output_with_parser(max_tokens, system_role, prompt,
-                                output_model=QuestionBank, llm_type="openai"):
-    """
-    Gọi LLM và trả về nội dung response đã được phân tích cú pháp.
-    """
-    parser = PydanticOutputParser(pydantic_object=output_model)
-    prompt_template = PromptTemplate(
-        input_variables=["system_role", "prompt"],
-        template= system_role + "\n" + prompt
-    )
-
-    if llm_type == "openai":
-        llm = ChatOpenAI(temperature=0, max_tokens=max_tokens, model="gpt-4", api_key=api_key)
-    else:
-        llm = ChatNVIDIA(temperature=0, max_tokens=max_tokens, model="meta/llama-3.3-70b-instruct", api_key=api_key_nvi)
-    chain = prompt_template | llm | parser
-    response = chain.invoke({
-        "system_role": system_role,
-        "prompt": prompt
-    })
-    return response.questions
+        response = self.client.invoke(messages)
+        return response.content if response else ""
