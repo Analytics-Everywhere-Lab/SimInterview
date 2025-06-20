@@ -1,0 +1,28 @@
+gradio
+ipykernel
+tensorrt==8.6.1
+librosa
+tqdm
+filetype
+imageio
+opencv_python_headless
+scikit-image
+cython
+cuda-python
+imageio-ffmpeg
+colored
+polygraphy
+numpy==2.0.1
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121
+triton --index-url https://download.pytorch.org/whl/cu118
+openai==1.88.0
+python-dotenv
+langchain
+langchain-chroma
+langchain-nvidia-ai-endpoints
+langchain-openai
+pymupdf
+langchain-community
